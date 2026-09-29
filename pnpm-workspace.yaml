@@ -60,3 +60,5 @@ minimumReleaseAgeExclude:
   - oxfmt@0.71.0
   - oxlint-tsgolint@7.0.2003
   - oxlint@1.86.0
+allowBuilds:
+  esbuild: true

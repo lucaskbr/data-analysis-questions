@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.ts",
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file=.env dist/index.js",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint .",
@@ -15,12 +17,19 @@
     "knip": "knip",
     "knip:production": "knip --production"
   },
+  "dependencies": {
+    "@google-cloud/bigquery": "9.1.0",
+    "@hono/node-server": "2.1.1",
+    "hono": "4.13.8",
+    "zod": "4.6.5"
+  },
   "devDependencies": {
     "@types/node": "26.6.3",
     "knip": "6.38.0",
     "oxfmt": "0.71.0",
     "oxlint": "1.86.0",
     "oxlint-tsgolint": "7.0.2003",
+    "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vitest": "5.0.1"
   }
