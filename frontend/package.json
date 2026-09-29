@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "api:generate": "openapi-ts -f openapi-ts.config.ts && oxfmt src/api/generated",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "format": "oxfmt .",
@@ -15,10 +16,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.103.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
