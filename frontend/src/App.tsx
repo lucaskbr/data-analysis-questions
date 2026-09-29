@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { type FormEvent, useState } from "react";
+import { type SubmitEvent, useEffect, useRef, useState } from "react";
 
 import { postChatMutation, type ChatResponse, type QueryResult, type Visualization } from "./api";
 import { ChartCard } from "./ChartCard";
@@ -24,6 +24,7 @@ function App() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [lastResponse, setLastResponse] = useState<ChatResponse>();
+  const conversationRef = useRef<HTMLElement>(null);
 
   const chat = useMutation({
     ...postChatMutation(),
@@ -45,7 +46,14 @@ function App() {
     },
   });
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    conversationRef.current?.scrollTo({
+      top: conversationRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, chat.isPending]);
+
+  function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = message.trim();
     if (!text || chat.isPending) return;
@@ -74,7 +82,7 @@ function App() {
         </button>
       </header>
 
-      <section className="conversation" aria-live="polite">
+      <section className="conversation" aria-live="polite" ref={conversationRef}>
         {messages.length === 0 ? (
           <div className="empty-state">
             <p>Try a question like:</p>

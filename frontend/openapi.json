@@ -1,0 +1,130 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Analytics Chat API",
+    "version": "0.1.0",
+    "description": "Contract for the Hono analytics-chat backend. Keep this file in sync with the backend OpenAPI document."
+  },
+  "servers": [{ "url": "http://localhost:3000" }],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is healthy.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat": {
+      "post": {
+        "operationId": "postChat",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ChatRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assistant response.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ChatResponse" } }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "413": {
+            "description": "Request body is too large.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          },
+          "500": {
+            "description": "Chat processing failed.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": ["status"],
+        "properties": { "status": { "type": "string", "example": "ok" } }
+      },
+      "ChatRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["conversationId", "message"],
+        "properties": {
+          "conversationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "message": { "type": "string", "minLength": 1, "maxLength": 16384 }
+        }
+      },
+      "AgentResponse": {
+        "type": "object",
+        "required": ["type", "title", "content", "suggestedQuestions"],
+        "properties": {
+          "type": { "type": "string", "enum": ["text", "data"] },
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "suggestedQuestions": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "Visualization": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "enum": ["bar", "line", "table"] },
+          "x": { "type": "string" },
+          "y": { "type": "string" }
+        }
+      },
+      "QueryResult": {
+        "type": "object",
+        "required": ["columns", "rows", "totalBytesProcessed"],
+        "properties": {
+          "columns": { "type": "array", "items": { "type": "string" } },
+          "rows": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "totalBytesProcessed": { "type": "number" }
+        }
+      },
+      "QueryTrace": {
+        "type": "object",
+        "required": ["sql", "result"],
+        "properties": {
+          "sql": { "type": "string" },
+          "result": { "$ref": "#/components/schemas/QueryResult" }
+        }
+      },
+      "ChatResponse": {
+        "type": "object",
+        "required": ["conversationId", "response", "queryTrace"],
+        "properties": {
+          "conversationId": { "type": "string" },
+          "response": { "$ref": "#/components/schemas/AgentResponse" },
+          "visualization": { "$ref": "#/components/schemas/Visualization" },
+          "queryTrace": { "type": "array", "items": { "$ref": "#/components/schemas/QueryTrace" } }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    }
+  }
+}
