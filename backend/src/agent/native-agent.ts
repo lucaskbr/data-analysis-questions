@@ -53,9 +53,30 @@ function functionCalls(output: Array<Record<string, unknown>>): FunctionCall[] {
   return output.filter((item) => item.type === "function_call") as unknown as FunctionCall[];
 }
 
+function isNumericMetric(value: unknown): boolean {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value !== "string" || value.trim() === "") return false;
+
+  return Number.isFinite(Number(value));
+}
+
+function isTemporalColumn(column: string): boolean {
+  return /(?:^|_)(?:date|day|week|month|quarter|year|time|timestamp|ts)(?:$|_)/i.test(column);
+}
+
 function visualizationFor(result: QueryResult): VisualizationMetadata {
-  const [x, y] = result.columns;
-  if (x && y && result.rows.length > 1) return { type: "bar", x, y };
+  const [x] = result.columns;
+  const metricColumns = result.columns.slice(1).filter((column) => {
+    const values = result.rows
+      .map((row) => row[column])
+      .filter((value) => value !== null && value !== undefined);
+    return !isTemporalColumn(column) && values.length > 0 && values.every(isNumericMetric);
+  });
+
+  const [y] = metricColumns;
+  if (x && y && metricColumns.length === 1 && result.rows.length > 1) {
+    return { type: "bar", x, y };
+  }
   return { type: "table" };
 }
 
