@@ -1,103 +1,144 @@
-import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { type FormEvent, useState } from "react";
 
-import heroImg from "./assets/hero.png";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
+import { postChatMutation, type ChatResponse, type QueryResult, type Visualization } from "./api";
+import { ChartCard } from "./ChartCard";
 
 import "./App.css";
 
+type Message = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  title?: string;
+  visualization?: Visualization;
+  result?: QueryResult;
+};
+
+function createConversationId() {
+  return crypto.randomUUID();
+}
+
 function App() {
-  const [count, setCount] = useState(0);
+  const [conversationId, setConversationId] = useState(createConversationId);
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [lastResponse, setLastResponse] = useState<ChatResponse>();
+
+  const chat = useMutation({
+    ...postChatMutation(),
+    onSuccess: (response, variables) => {
+      setMessages((current) => [
+        ...current,
+        { id: crypto.randomUUID(), role: "user", content: variables.body.message },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          title: response.response.title,
+          content: response.response.content,
+          visualization: response.visualization,
+          result: response.queryTrace.at(-1)?.result,
+        },
+      ]);
+      setLastResponse(response);
+      setMessage("");
+    },
+  });
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = message.trim();
+    if (!text || chat.isPending) return;
+
+    chat.mutate({ body: { conversationId, message: text } });
+  }
+
+  function startNewConversation() {
+    setConversationId(createConversationId());
+    setMessages([]);
+    setLastResponse(undefined);
+    setMessage("");
+    chat.reset();
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <main className="chat-page">
+      <header className="chat-header">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+          <p className="eyebrow">Analytics assistant</p>
+          <h1>Ask your data a question</h1>
+          <p className="subtitle">This page sends requests to the local analytics-chat API.</p>
         </div>
-        <button type="button" className="counter" onClick={() => setCount((count) => count + 1)}>
-          Count is {count}
+        <button className="secondary-button" type="button" onClick={startNewConversation}>
+          New conversation
         </button>
+      </header>
+
+      <section className="conversation" aria-live="polite">
+        {messages.length === 0 ? (
+          <div className="empty-state">
+            <p>Try a question like:</p>
+            <button
+              type="button"
+              onClick={() => setMessage("How many active users did we have yesterday?")}
+            >
+              How many active users did we have yesterday?
+            </button>
+          </div>
+        ) : (
+          messages.map((item) => (
+            <article className={`message ${item.role}`} key={item.id}>
+              <p className="message-role">{item.role === "user" ? "You" : item.title}</p>
+              <p>{item.content}</p>
+              {item.role === "assistant" && item.visualization && (
+                <ChartCard visualization={item.visualization} result={item.result} />
+              )}
+            </article>
+          ))
+        )}
+
+        {chat.isPending && (
+          <article className="message assistant loading">
+            <p className="message-role">Analytics assistant</p>
+            <p>Looking into it…</p>
+          </article>
+        )}
       </section>
 
-      <div className="ticks"></div>
+      {chat.isError && (
+        <p className="error" role="alert">
+          {chat.error.error || "The API request failed. Is the backend running?"}
+        </p>
+      )}
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      <form className="composer" onSubmit={submit}>
+        <label htmlFor="message">Your question</label>
+        <div className="composer-row">
+          <textarea
+            id="message"
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder="Ask about your analytics…"
+            rows={3}
+            disabled={chat.isPending}
+          />
+          <button
+            className="send-button"
+            type="submit"
+            disabled={!message.trim() || chat.isPending}
+          >
+            {chat.isPending ? "Sending…" : "Send"}
+          </button>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg className="button-icon" role="presentation" aria-hidden="true">
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      </form>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      {lastResponse && (
+        <details className="request-details">
+          <summary>Last response details ({lastResponse.queryTrace.length} queries)</summary>
+          <pre>{JSON.stringify(lastResponse, null, 2)}</pre>
+        </details>
+      )}
+    </main>
   );
 }
 
