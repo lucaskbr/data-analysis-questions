@@ -1,0 +1,21 @@
+{
+  "name": "template-typescript-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --parallel --filter backend --filter frontend run dev",
+    "build": "pnpm -r --if-present run build",
+    "format": "pnpm -r --if-present run format",
+    "format:check": "pnpm -r --if-present run format:check",
+    "lint": "pnpm -r --if-present run lint",
+    "lint:fix": "pnpm -r --if-present run lint:fix",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "test:watch": "pnpm --filter backend run test:watch",
+    "knip": "pnpm -r --if-present run knip",
+    "knip:production": "pnpm -r --if-present run knip:production",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run knip"
+  },
+  "packageManager": "pnpm@12.8.1"
+}

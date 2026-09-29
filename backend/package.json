@@ -1,0 +1,27 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "typecheck": "oxlint --type-aware --type-check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "knip": "knip",
+    "knip:production": "knip --production"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "knip": "6.38.0",
+    "oxfmt": "0.71.0",
+    "oxlint": "1.86.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  }
+}
