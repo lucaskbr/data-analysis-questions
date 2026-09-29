@@ -12,9 +12,12 @@ describe("createApp", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("returns service information from the root route", async () => {
-    const response = await createApp().request("/");
+    const response = await createApp().request("/", {
+      headers: { "X-Request-ID": "request-123" },
+    });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("X-Request-ID")).toBe("request-123");
     await expect(response.json()).resolves.toEqual({
       name: "analytics-chat-backend",
       status: "ok",

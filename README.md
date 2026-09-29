@@ -84,6 +84,12 @@ The response includes the model's `analysis`, optional visualization metadata, a
 - BigQuery performs a dry run before execution; queries over the byte limit are rejected.
 - OpenAI request state is not stored by the API (`store: false`); the MVP conversation store is in memory.
 
+## Observability
+
+The backend writes newline-delimited JSON logs to standard output. Every request has a `requestId`; send an `X-Request-ID` header to supply your own, or use the ID returned in the response header to correlate events. The API emits request, chat, agent, OpenAI, and BigQuery lifecycle events with filterable fields such as `event`, `statusCode`, `durationMs`, `model`, `rowCount`, and `totalBytesProcessed`.
+
+Logs do not include API keys, user messages, SQL text, query results, or OpenAI response content.
+
 ## Quality checks and production build
 
 ```sh

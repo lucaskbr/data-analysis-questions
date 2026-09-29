@@ -1,6 +1,12 @@
 import type { ConversationMessage } from "../conversation/conversation-store.js";
 import type { QueryExecutor, QueryResult } from "../data/query-executor.js";
 import type { FunctionCall, FunctionTool, LlmClient } from "../llm/client.js";
+import { logger } from "../observability/logger.js";
+import {
+  AGENT_RESPONSE_FORMAT,
+  parseAgentResponse,
+  type AgentResponse,
+} from "./response-format.js";
 
 export interface QueryTrace {
   sql: string;
@@ -14,7 +20,7 @@ interface VisualizationMetadata {
 }
 
 export interface AgentResult {
-  analysis: string;
+  response: AgentResponse;
   visualization?: VisualizationMetadata;
   queryTrace: QueryTrace[];
 }
@@ -63,44 +69,68 @@ export class NativeAgent {
   async run(history: ConversationMessage[]): Promise<AgentResult> {
     let input = history.map(toInput);
     const queryTrace: QueryTrace[] = [];
+    logger.info("agent_run_started", { historyMessageCount: history.length });
 
     for (let iteration = 0; iteration < this.maxIterations; iteration += 1) {
-      const response = await this.llm.createResponse(input, [RUN_SQL_TOOL]);
-      const calls = functionCalls(response.output);
+      const llmResponse = await this.llm.createResponse(
+        input,
+        [RUN_SQL_TOOL],
+        AGENT_RESPONSE_FORMAT,
+      );
+      const calls = functionCalls(llmResponse.output);
+      logger.info("agent_iteration_completed", {
+        iteration: iteration + 1,
+        functionCallCount: calls.length,
+      });
 
       if (calls.length === 0) {
         const result = {
-          analysis: response.outputText || "I could not produce an analysis.",
+          response: parseAgentResponse(llmResponse.outputText),
           queryTrace,
         };
         const lastQuery = queryTrace.at(-1);
+        logger.info("agent_run_completed", {
+          iteration: iteration + 1,
+          queryCount: queryTrace.length,
+        });
         return lastQuery
           ? { ...result, visualization: visualizationFor(lastQuery.result) }
           : result;
       }
 
-      input = [...input, ...response.output];
+      input = [...input, ...llmResponse.output];
       for (const call of calls) {
         const toolOutput = await this.executeToolCall(call, queryTrace);
         input.push({ type: "function_call_output", call_id: call.call_id, output: toolOutput });
       }
     }
 
+    logger.info("agent_run_limit_reached", { maxIterations: this.maxIterations });
     throw new Error(`Agent exceeded the ${this.maxIterations}-iteration limit.`);
   }
 
   private async executeToolCall(call: FunctionCall, queryTrace: QueryTrace[]): Promise<string> {
-    if (call.name !== "run_sql") return JSON.stringify({ error: `Unknown tool: ${call.name}` });
+    if (call.name !== "run_sql") {
+      logger.info("agent_tool_rejected", { toolName: call.name });
+      return JSON.stringify({ error: `Unknown tool: ${call.name}` });
+    }
 
     try {
       const parsed = JSON.parse(call.arguments) as { sql?: unknown };
       if (typeof parsed.sql !== "string")
         throw new Error("run_sql requires a string sql argument.");
 
+      logger.info("agent_tool_started", { toolName: call.name, sqlLength: parsed.sql.length });
       const result = await this.queryExecutor.run(parsed.sql);
       queryTrace.push({ sql: parsed.sql, result });
+      logger.info("agent_tool_completed", {
+        toolName: call.name,
+        rowCount: result.rows.length,
+        totalBytesProcessed: result.totalBytesProcessed,
+      });
       return JSON.stringify(result);
     } catch (error) {
+      logger.error("agent_tool_failed", error, { toolName: call.name });
       return JSON.stringify({
         error: error instanceof Error ? error.message : "Tool execution failed.",
       });

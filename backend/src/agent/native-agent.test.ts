@@ -43,7 +43,15 @@ class FakeLlmClient implements LlmClient {
         outputText: "",
       };
     }
-    return { output: [], outputText: "Users increased from 10 to 12." };
+    return {
+      output: [],
+      outputText: JSON.stringify({
+        type: "data",
+        title: "User trend",
+        content: "Users increased from 10 to 12.",
+        suggestedQuestions: ["Compare users by channel"],
+      }),
+    };
   }
 }
 
@@ -57,7 +65,12 @@ describe("NativeAgent", () => {
       { role: "user", content: "How did users change?", createdAt: "2026-01-01T00:00:00.000Z" },
     ]);
 
-    expect(result.analysis).toBe("Users increased from 10 to 12.");
+    expect(result.response).toEqual({
+      type: "data",
+      title: "User trend",
+      content: "Users increased from 10 to 12.",
+      suggestedQuestions: ["Compare users by channel"],
+    });
     expect(queryExecutor.lastSql).toBe("SELECT date, users FROM `demo.analytics_123.events_*`");
     expect(result.visualization).toEqual({ type: "bar", x: "date", y: "users" });
     expect(result.queryTrace).toHaveLength(1);

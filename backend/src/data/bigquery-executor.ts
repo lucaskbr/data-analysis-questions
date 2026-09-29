@@ -1,5 +1,6 @@
 import { BigQuery, type Query } from "@google-cloud/bigquery";
 
+import { logger } from "../observability/logger.js";
 import type { QueryExecutor, QueryLimits, QueryResult } from "./query-executor.js";
 
 const DISALLOWED_SQL =
@@ -46,36 +47,63 @@ export class BigQueryExecutor implements QueryExecutor {
   }
 
   async run(sql: string): Promise<QueryResult> {
-    validateSql(sql, this.dataset);
+    const startedAt = Date.now();
+    logger.info("bigquery_query_started", { dataset: this.dataset, sqlLength: sql.length });
+    try {
+      validateSql(sql, this.dataset);
 
-    const [dryRun] = await this.bigQuery.createQueryJob({
-      query: sql,
-      dryRun: true,
-      useLegacySql: false,
-    });
-    const totalBytesProcessed = Number(dryRun.metadata.statistics?.query?.totalBytesProcessed ?? 0);
-
-    if (totalBytesProcessed > this.limits.maxBytesBilled) {
-      throw new SqlValidationError(
-        `Query would process ${totalBytesProcessed} bytes, exceeding the configured limit.`,
+      const [dryRun] = await this.bigQuery.createQueryJob({
+        query: sql,
+        dryRun: true,
+        useLegacySql: false,
+      });
+      const totalBytesProcessed = Number(
+        dryRun.metadata.statistics?.query?.totalBytesProcessed ?? 0,
       );
+      logger.info("bigquery_query_dry_run_completed", {
+        dataset: this.dataset,
+        totalBytesProcessed,
+      });
+
+      if (totalBytesProcessed > this.limits.maxBytesBilled) {
+        logger.info("bigquery_query_cost_limit_exceeded", {
+          dataset: this.dataset,
+          maxBytesBilled: this.limits.maxBytesBilled,
+          totalBytesProcessed,
+        });
+        throw new SqlValidationError(
+          `Query would process ${totalBytesProcessed} bytes, exceeding the configured limit.`,
+        );
+      }
+
+      const query: Query = {
+        query: sql,
+        maximumBytesBilled: String(this.limits.maxBytesBilled),
+        maxResults: this.limits.maxRows,
+        useLegacySql: false,
+      };
+      const [rows] = await this.bigQuery.query(query);
+      const normalizedRows = rows.map(
+        (row) => JSON.parse(JSON.stringify(row)) as Record<string, unknown>,
+      );
+
+      logger.info("bigquery_query_completed", {
+        dataset: this.dataset,
+        durationMs: Date.now() - startedAt,
+        rowCount: normalizedRows.length,
+        totalBytesProcessed,
+      });
+      return {
+        columns: Object.keys(normalizedRows[0] ?? {}),
+        rows: normalizedRows,
+        totalBytesProcessed,
+      };
+    } catch (error) {
+      logger.error("bigquery_query_failed", error, {
+        dataset: this.dataset,
+        durationMs: Date.now() - startedAt,
+      });
+      throw error;
     }
-
-    const query: Query = {
-      query: sql,
-      maximumBytesBilled: String(this.limits.maxBytesBilled),
-      maxResults: this.limits.maxRows,
-      useLegacySql: false,
-    };
-    const [rows] = await this.bigQuery.query(query);
-    const normalizedRows = rows.map(
-      (row) => JSON.parse(JSON.stringify(row)) as Record<string, unknown>,
-    );
-
-    return {
-      columns: Object.keys(normalizedRows[0] ?? {}),
-      rows: normalizedRows,
-      totalBytesProcessed,
-    };
   }
 }
