@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const agentResponseSchema = z.object({
+const agentResponseSchema = z.object({
   type: z.enum(["text", "data"]),
   title: z.string(),
   content: z.string(),
